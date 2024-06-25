@@ -40,6 +40,7 @@ class FcmChannel
         }
 
         $fcmMessage = $notification->toFcm($notifiable);
+        Log::notice('tesitng');
 
         return Collection::make($tokens)
             ->chunk(self::TOKENS_PER_REQUEST)
