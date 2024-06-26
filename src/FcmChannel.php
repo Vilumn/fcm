@@ -33,19 +33,31 @@ class FcmChannel
      */
     public function send(mixed $notifiable, Notification $notification): ?Collection
     {
-        $tokens = Arr::wrap($notifiable->routeNotificationFor('fcm', $notification));
+        $tokens = $notifiable->routeNotificationFor('fcm', $notification);
 
         if (empty($tokens)) {
             return null;
         }
 
-        $fcmMessage = $notification->toFcm($notifiable);
-        Log::notice('tesitng');
+        $androidCollection = Collection::make([]);
+        $iosCollection = Collection::make([]);
 
-        return Collection::make($tokens)
-            ->chunk(self::TOKENS_PER_REQUEST)
-            ->map(fn ($tokens) => ($fcmMessage->client ?? $this->client)->sendMulticast($fcmMessage, $tokens->all()))
-            ->map(fn (MulticastSendReport $report) => $this->checkReportForFailures($notifiable, $notification, $report));
+        foreach ($tokens as $tknKey => $tknVal) {
+            $fcmMessage = $notification->toFcm($notifiable, $tknKey);
+
+            $collection = Collection::make($tknVal)
+                ->chunk(self::TOKENS_PER_REQUEST)
+                ->map(fn ($tknVal) => ($fcmMessage->client ?? $this->client)->sendMulticast($fcmMessage, $tknVal->all()))
+                ->map(fn (MulticastSendReport $report) => $this->checkReportForFailures($notifiable, $notification, $report));
+
+            if ($tknKey === 'android') {
+                $androidCollection = $collection;
+            } else if ($tknKey === 'ios') {
+                $iosCollection = $collection;
+            }
+        }
+
+        return $androidCollection->merge($iosCollection);
     }
 
     /**
